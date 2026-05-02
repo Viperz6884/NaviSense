@@ -1,0 +1,25 @@
+<resources>
+
+    <!-- ✅ MAIN APP THEME (REQUIRED) -->
+    <style name="Theme.Companion" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- You can customize colors later -->
+    </style>
+
+    <!-- ✅ SPLASH THEME -->
+    <style name="Theme.Companion.Splash" parent="Theme.SplashScreen">
+
+        <!-- Background -->
+        <item name="windowSplashScreenBackground">@color/splash_start</item>
+
+        <!-- Icon -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+
+        <!-- Optional icon background -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/splash_end</item>
+
+        <!-- After splash -->
+        <item name="postSplashScreenTheme">@style/Theme.Companion</item>
+
+    </style>
+
+</resources>

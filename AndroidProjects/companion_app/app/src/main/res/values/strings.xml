@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Companion</string>
+    <string name="accessibility_service_description">Allows volume buttons to open the Companion app.</string>
+</resources>
