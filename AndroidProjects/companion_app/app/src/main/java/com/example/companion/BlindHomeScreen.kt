@@ -1,5 +1,17 @@
 package com.example.companion
 
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.AccountCircle
+import android.widget.Toast
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Settings
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -66,6 +78,14 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+// Data class for a single bottom navigation item
+data class BottomNavItem(
+    val title: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val onClick: () -> Unit,
+    val isHighlighted: Boolean = false // Special property for the middle Speak button
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlindHomeScreen(navController: NavController) {
@@ -100,9 +120,9 @@ fun BlindHomeScreen(navController: NavController) {
         id!!
     }
 
-    // TODO: Replace with actual fetched user data
-    val myName = "John Doe"
-    val myPhoneNumber = "+91 9876543210"
+    // ── Live User Details ──
+    var myName by remember { mutableStateOf("Loading...") }
+    var myEmail by remember { mutableStateOf("Loading...") }
 
     // ── State ─────────────────────────────────────────────────────────────────
     var isWalking by remember { mutableStateOf(false) }
@@ -112,6 +132,19 @@ fun BlindHomeScreen(navController: NavController) {
 
     // ── Load guardian phone + register in Firestore ───────────────────────────
     LaunchedEffect(Unit) {
+        // NEW: Fetch live user profile data
+        val authUser = FirebaseAuth.getInstance().currentUser
+        if (authUser != null) {
+            myEmail = authUser.email ?: "No email linked"
+
+            FirebaseFirestore.getInstance().collection("Users").document(authUser.uid).get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        // We will look for a 'name' field. If they haven't set one yet, we provide a default.
+                        myName = document.getString("name") ?: "Companion User"
+                    }
+                }
+        }
         FirebaseManager.registerBlindPerson(myUniqueId)
 
         FirebaseManager.getGuardianPhone(myUniqueId) { phone ->
@@ -217,6 +250,42 @@ fun BlindHomeScreen(navController: NavController) {
             tts.speak("I didn't catch that, please try again", TextToSpeech.QUEUE_FLUSH, null, null)
         }
     }
+    val navItems = listOf(
+        // Slot 1: Home Button (Leftmost)
+        BottomNavItem(
+            title = "Home",
+            icon = Icons.Default.Home,
+            onClick = { Toast.makeText(context, "You are already home", Toast.LENGTH_SHORT).show() }
+        ),
+        // Slot 2: Stick Button
+        BottomNavItem(
+            title = "Stick",
+            icon = Icons.Default.Accessibility, // A good placeholder for accessibility devices
+            onClick = { Toast.makeText(context, " Personalized Stick page coming soon!", Toast.LENGTH_SHORT).show() }
+        ),
+        // Slot 3: Highlighted Speak Button (Middle)
+        BottomNavItem(
+            title = "Speak",
+            icon = Icons.Default.Mic,
+            isHighlighted = true, // Tell the system this button is special!
+            onClick = {
+                // This triggers the speech recognition you set up earlier
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                }
+                speechLauncher.launch(intent)
+            }
+        ),
+        // (Slot 4: We will skip this slot for now)
+
+        // Slot 5: Profile Button (Rightmost)
+        BottomNavItem(
+            title = "Profile",
+            icon = Icons.Default.AccountCircle,
+            onClick = { Toast.makeText(context, "Opening Profile...", Toast.LENGTH_SHORT).show() }
+        )
+    )
 
     // ── UI ────────────────────────────────────────────────────────────────────
     ModalNavigationDrawer(
@@ -249,7 +318,8 @@ fun BlindHomeScreen(navController: NavController) {
                         Spacer(Modifier.height(6.dp))
                         Text("ID: $myUniqueId", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(6.dp))
-                        Text("Phone: $myPhoneNumber", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        // Changed this from Phone to Email:
+                        Text("Email: $myEmail", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     }
                 }
 
@@ -311,44 +381,130 @@ fun BlindHomeScreen(navController: NavController) {
                     }
                 }
             },
-            floatingActionButton = {
-                // Large Central Mic Button replacing "Start Walk"
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(
-                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                            )
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                        }
-                        speechLauncher.launch(intent)
-                    },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = CircleShape,
-                    modifier = Modifier.size(width = 120.dp, height = 120.dp)
+            bottomBar = {
+                // We use a Box so we can draw the Speak button ON TOP of the slim footer panel
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    // 1. The Slimmer Background Panel
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shadowElevation = 16.dp,
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                // REDUCED PADDING: We shrunk this from 16.dp to 8.dp to slim the footer
+                                .padding(top = 8.dp, bottom = 8.dp)
+                                .navigationBarsPadding(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            // 1. Home Button
+                            Column(
+                                modifier = Modifier.size(56.dp).clickable { /* TODO: Navigate to Home */ },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.Home, "Home", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                Spacer(Modifier.height(2.dp))
+                                Text("Home", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                            }
+
+                            // 2. Stick Button
+                            Column(
+                                modifier = Modifier.size(56.dp).clickable { /* TODO: Open Stick settings */ },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.Accessibility, "Stick", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                Spacer(Modifier.height(2.dp))
+                                Text("Stick", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                            }
+
+                            // 3. Invisible Spacer
+                            // This holds the physical empty gap in the Row so the floating button has a place to sit
+                            Spacer(modifier = Modifier.width(56.dp))
+
+                            // 4. The Blank Slot
+                            Box(modifier = Modifier.size(56.dp))
+                            // 4. The Contact Button (Fourth from left)
+                            Column(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clickable {
+                                        if (guardianPhone != null) {
+                                            // Speaks out loud to confirm, then triggers the phone call
+                                            tts.speak("Calling guardian", TextToSpeech.QUEUE_FLUSH, null, null)
+                                            triggerSosCall(context, guardianPhone!!)
+                                        } else {
+                                            // Failsafe if they haven't linked a guardian yet
+                                            tts.speak("No guardian connected yet", TextToSpeech.QUEUE_FLUSH, null, null)
+                                        }
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = "Contact",
+                                    modifier = Modifier.size(28.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = "Contact",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+
+                            // 5. Profile Button
+                            Column(
+                                modifier = Modifier.size(56.dp).clickable { /* TODO: Open Profile */ },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.AccountCircle, "Profile", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                Spacer(Modifier.height(2.dp))
+                                Text("Profile", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                            }
+                        }
+                    }
+
+                    // 2. The Overlapping Speak Button
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                            }
+                            speechLauncher.launch(intent)
+                        },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            // We align it to the TopCenter of the Box (which is the top curved edge of the footer)
+                            .align(Alignment.TopCenter)
+                            // This offset pushes it UP into the screen, making it break out of the footer!
+                            .offset(y = (-36).dp)
+                            .size(width = 85.dp, height = 85.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Mic,
                             contentDescription = "Tap to Speak",
                             modifier = Modifier.size(48.dp)
                         )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "SPEAK",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
                     }
                 }
-            },
-            floatingActionButtonPosition = FabPosition.Center
-        ) { innerPadding ->
+            }
+        ){ innerPadding ->
             Box(
                 modifier = Modifier
                     .padding(innerPadding)
@@ -482,3 +638,77 @@ fun triggerSosCall(context: Context, phone: String) {
 }
 
 private fun Double.fmt(d: Int) = "%.${d}f".format(this)
+
+@Composable
+fun BlindPersonBottomBar(items: List<BottomNavItem>) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant, // Give it a distinct panel background
+        shadowElevation = 16.dp, // Nice shadow for separation
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp) // Round the top corners
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .navigationBarsPadding(), // Ensures it works with different system nav bars
+            horizontalArrangement = Arrangement.SpaceBetween, // Automatically handle spacing!
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            // Loop through each of our 4 items
+            items.forEachIndexed { index, item ->
+
+                // --- Insert the blank slot logic before the 4th item (Profile) ---
+                if (index == 3) {
+                    // This creates an empty box that takes up the same space as a button
+                    Box(modifier = Modifier.size(width = 60.dp, height = 60.dp))
+                }
+
+                if (item.isHighlighted) {
+                    // --- Special layout for the central, highlighted Speak button ---
+                    Column(
+                        modifier = Modifier
+                            .clickable { item.onClick() }
+                            .padding(12.dp)
+                            .size(60.dp) // Total size of the special element
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer, // High-contrast, highlighted color
+                                shape = CircleShape // Round background shape
+                            ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.title,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer, // Text color on highlighted container
+                            modifier = Modifier.size(28.dp) // A bit bigger icon
+                        )
+                    }
+                } else {
+                    // --- Standard layout for other buttons (Home, Stick, Profile) ---
+                    Column(
+                        modifier = Modifier
+                            .clickable { item.onClick() }
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.title,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), // Softer color for secondary buttons
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = item.title,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

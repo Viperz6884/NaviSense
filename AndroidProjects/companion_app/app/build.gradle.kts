@@ -70,6 +70,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
+    //Authentication
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+
     // Navigation (ONLY ONE)
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
