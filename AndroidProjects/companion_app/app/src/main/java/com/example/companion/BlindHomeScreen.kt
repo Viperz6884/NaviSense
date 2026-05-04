@@ -1,5 +1,10 @@
 package com.example.companion
 
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.VerifiedUser
+import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Location
@@ -11,7 +16,7 @@ import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-
+import androidx.compose.material.icons.outlined.WarningAmber
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
@@ -161,8 +166,21 @@ fun BlindHomeScreen(navController: NavController) {
     // This automatically watches the Flow we created and updates the UI instantly
     val isWalking by movementDetector.isWalkingFlow.collectAsState()
     // ── Live Weather & GPS State ─────────────────────────────────────────────
+    // ── Live Weather & GPS State ─────────────────────────────────────────────
     var weatherData by remember { mutableStateOf(LiveWeatherData(condition = "Checking GPS...")) }
 
+    // ── Live Hazard State ──────────────────────────────────────────────────
+    // For now, we simulate fetching these short lines from the internet/maps
+    var nearbyHazards by remember {
+        mutableStateOf(
+            listOf(
+                "Construction work on left sidewalk.",
+                "Uneven pavement reported 5 meters ahead."
+            )
+        )
+    }
+
+    // We deleted the duplicate 'val context = LocalContext.current' that was here!
     // We deleted the duplicate 'val context = LocalContext.current' that was here!
 
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
@@ -614,13 +632,21 @@ fun BlindHomeScreen(navController: NavController) {
                 modifier = Modifier
                     .padding(innerPadding)
                     .fillMaxSize(),
-                contentAlignment = Alignment.Center
+                // 1. Changed Center to TopCenter so it scrolls naturally from the top down
+                contentAlignment = Alignment.TopCenter
             ) {
+                // 2. Remember the scroll position
+                val scrollState = rememberScrollState()
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .padding(top = 24.dp) // Gives a little breathing room at the top
+                        .verticalScroll(scrollState) // 3. This makes the whole page scrollable!
                 ) {
+                    // ── Status & Steps Row ────────────────────────────────────
                     // ── Status & Steps Row ────────────────────────────────────
                     // ── Steps & Status Area (Right Aligned) ─────────────────────────
                     // ── Centered Step & Status Tracker ─────────────────────────
@@ -648,6 +674,7 @@ fun BlindHomeScreen(navController: NavController) {
                     // ── NEW: Weather Safety Card ────────
                     // For now, we pass the exact design data. We will replace these
                     // with live variables once the API is connected!
+
                     // ── LIVE: Weather Safety Card ────────
                     WeatherSafetyCard(
                         condition = weatherData.condition,
@@ -658,11 +685,35 @@ fun BlindHomeScreen(navController: NavController) {
                         cityName = weatherData.cityName
                     )
 
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── NEW: Live Hazard Alerts ────────
+                    HazardAlertCard(
+                        hazards = nearbyHazards,
+                        searchRadius = 15
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── NEW: Safe Zone & AI Insights ────────
+                    StatusCardsRow()
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── NEW: Emergency Protocol Button ────────
+                    EmergencyProtocolCard(
+                        onClick = {
+                            if (guardianPhone != null) {
+                                triggerSosCall(context, guardianPhone!!)
+                                Toast.makeText(context, "Initiating Emergency Protocol...", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "No guardian connected!", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    )
+
                     Spacer(Modifier.height(24.dp))
-
-                    Spacer(Modifier.height(16.dp))
-
-                    Spacer(Modifier.height(16.dp))
+                    // ── Unique ID Card ────────────────────────────────────────
 
                     // ── Unique ID Card ────────────────────────────────────────
                     Card(
@@ -1161,6 +1212,272 @@ suspend fun fetchLiveWeather(apiKey: String, lat: Double, lon: Double): LiveWeat
 
         } catch (e: Exception) {
             LiveWeatherData("Weather Unavailable", 0, "Unknown", "UNKNOWN", Color.Gray, "Error")
+        }
+    }
+}
+
+@Composable
+fun HazardAlertCard(
+    hazards: List<String>, // We take a list of strings (the short alerts)
+    searchRadius: Int = 15 // Default to 15 meters as you suggested
+) {
+    // Only show the card if there are actually hazards to report!
+    if (hazards.isNotEmpty()) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                // Use a soft, high-contrast warning color (like a dark amber/red)
+                containerColor = Color(0xFF3E2723) // Dark brown/red
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                // ── HEADER: Icon & Title ──
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.WarningAmber,
+                        contentDescription = "Warning",
+                        tint = Color(0xFFFFB300), // Bright amber warning color
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "HAZARDS WITHIN ${searchRadius}m",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── HAZARD LIST ──
+                hazards.forEachIndexed { index, hazard ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // A small bullet point
+                        Box(
+                            modifier = Modifier
+                                .padding(top = 6.dp, end = 8.dp)
+                                .size(6.dp)
+                                .background(Color(0xFFFFB300), CircleShape)
+                        )
+                        Text(
+                            text = hazard,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 22.sp
+                        )
+                    }
+                    // Add a tiny divider between items, but not after the last one
+                    if (index < hazards.size - 1) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = Color.White.copy(alpha = 0.1f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusCardsRow() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp) // Puts a perfect gap between the cards
+    ) {
+        // ── CARD 1: Safe Zone Status ──
+        DashboardSmallCard(
+            modifier = Modifier.weight(1f), // weight(1f) makes them share 50% of the screen each
+            icon = Icons.Outlined.VerifiedUser,
+            iconTint = Color(0xFFA87FFB), // Neon Purple
+            iconBg = Color(0xFF2D2440),   // Dark Purple BG
+            badgeText = "SECURE",
+            badgeColor = Color(0xFFA87FFB),
+            badgeBg = Color(0xFF2D2440),
+            title = "SAFE ZONE STATUS",
+            subtitle = "Residential Area - Level 1"
+        )
+
+        // ── CARD 2: AI Insights ──
+        DashboardSmallCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Outlined.Psychology,
+            iconTint = Color(0xFFE0E0E0), // Light Grey
+            iconBg = Color(0xFF2A2A2E),   // Dark Grey BG
+            badgeText = "ACTIVE",
+            badgeColor = Color(0xFFE0E0E0),
+            badgeBg = Color(0xFF2A2A2E),
+            title = "NEARBY AI INSIGHTS",
+            subtitle = "Clear path ahead; low traffic detected."
+        )
+    }
+}
+
+@Composable
+fun DashboardSmallCard(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    iconBg: Color,
+    badgeText: String,
+    badgeColor: Color,
+    badgeBg: Color,
+    title: String,
+    subtitle: String
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1E)) // Deep dark gray
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // ── Top Row: Icon Box & Badge ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                // The square icon box with rounded corners
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(iconBg, RoundedCornerShape(10.dp))
+                        .border(1.dp, iconTint.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // The little text badge (SECURE / ACTIVE)
+                Surface(
+                    color = badgeBg,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = badgeText,
+                        color = badgeColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Bottom Row: Text ──
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = subtitle,
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun EmergencyProtocolCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        // A very dark, subtle reddish-black background
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1414))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // ── The Left Icon Box ──
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color(0xFF332020), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE57373).copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Using a large asterisk just like your image!
+                    Text(
+                        text = "*",
+                        color = Color(0xFFE57373),
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.Medium,
+                        // Nudge the asterisk down slightly so it visually centers perfectly
+                        modifier = Modifier.offset(y = 6.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // ── The Text Column ──
+                Column {
+                    Text(
+                        text = "EMERGENCY PROTOCOL",
+                        color = Color(0xFFE57373), // Salmon / Light Red
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "TAP FOR IMMEDIATE SUPPORT",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+
+            // ── The Right Arrow ──
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowRight,
+                contentDescription = "Proceed",
+                tint = Color(0xFFE57373).copy(alpha = 0.5f),
+                modifier = Modifier.size(32.dp)
+            )
         }
     }
 }
