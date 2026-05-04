@@ -8,7 +8,7 @@ object GeminiManager {
 
     private val model = GenerativeModel(
         modelName = "gemini-1.5-flash",
-        apiKey = "YOUR_GOOGLE_API_KEY_HERE"
+        apiKey = "AIzaSyCbMxY892bNgycn_uhLPk3wcDn0a9fzAJc"
     )
 
     suspend fun processCommand(userInput: String): String {
