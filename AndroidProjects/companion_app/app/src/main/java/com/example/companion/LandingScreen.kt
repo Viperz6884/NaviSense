@@ -5,60 +5,27 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 
 @Composable
-fun LandingScreen(navController: NavController) {
+fun LandingPage(onBlindClick: () -> Unit, onGuardianClick: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Title
-        Text(
-            text = "Welcome to Companion",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 16.dp),
-            textAlign = TextAlign.Center
-        )
+        Text(text = "Welcome to Companion", fontSize = 28.sp, style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(48.dp))
 
-        // Subtitle
-        Text(
-            text = "Bridging the gap between visually impaired individuals and their guardians.",
-            fontSize = 16.sp,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 48.dp)
-        )
-
-        // Login Button
-        Button(
-            onClick = { navController.navigate("login") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-        ) {
-            Text("Log In", fontSize = 18.sp)
+        Button(onClick = onBlindClick, modifier = Modifier.fillMaxWidth().height(80.dp)) {
+            Text("I am a Blind Person", fontSize = 20.sp)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Sign Up Button
-        OutlinedButton(
-            onClick = { navController.navigate("signup") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-        ) {
-            Text("Create an Account", fontSize = 18.sp)
+        Button(onClick = onGuardianClick, modifier = Modifier.fillMaxWidth().height(80.dp)) {
+            Text("I am a Guardian", fontSize = 20.sp)
         }
     }
 }
