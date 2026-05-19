@@ -1,5 +1,9 @@
 package com.example.companion
 
+import androidx.compose.ui.draw.rotate
+import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Psychology
@@ -71,6 +75,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -85,6 +90,8 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -126,6 +133,11 @@ data class BottomNavItem(
 @Composable
 fun BlindHomeScreen(navController: NavController) {
     val context = LocalContext.current
+    // Start the background service so it listens to Firebase even if the app gets closed
+    LaunchedEffect(Unit) {
+        val serviceIntent = Intent(context, SosBackgroundService::class.java)
+        context.startService(serviceIntent)
+    }
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
@@ -371,42 +383,7 @@ fun BlindHomeScreen(navController: NavController) {
             tts.speak("I didn't catch that, please try again", TextToSpeech.QUEUE_FLUSH, null, null)
         }
     }
-    val navItems = listOf(
-        // Slot 1: Home Button (Leftmost)
-        BottomNavItem(
-            title = "Home",
-            icon = Icons.Default.Home,
-            onClick = { Toast.makeText(context, "You are already home", Toast.LENGTH_SHORT).show() }
-        ),
-        // Slot 2: Stick Button
-        BottomNavItem(
-            title = "Stick",
-            icon = Icons.Default.Accessibility, // A good placeholder for accessibility devices
-            onClick = { Toast.makeText(context, " Personalized Stick page coming soon!", Toast.LENGTH_SHORT).show() }
-        ),
-        // Slot 3: Highlighted Speak Button (Middle)
-        BottomNavItem(
-            title = "Speak",
-            icon = Icons.Default.Mic,
-            isHighlighted = true, // Tell the system this button is special!
-            onClick = {
-                // This triggers the speech recognition you set up earlier
-                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                }
-                speechLauncher.launch(intent)
-            }
-        ),
-        // (Slot 4: We will skip this slot for now)
 
-        // Slot 5: Profile Button (Rightmost)
-        BottomNavItem(
-            title = "Profile",
-            icon = Icons.Default.AccountCircle,
-            onClick = { Toast.makeText(context, "Opening Profile...", Toast.LENGTH_SHORT).show() }
-        )
-    )
 
     // ── UI ────────────────────────────────────────────────────────────────────
     ModalNavigationDrawer(
@@ -463,12 +440,11 @@ fun BlindHomeScreen(navController: NavController) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Left Half (Menu + Title)
                         Row(
-                            modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
@@ -483,151 +459,59 @@ fun BlindHomeScreen(navController: NavController) {
                             )
                         }
 
-                        // Right Half (SOS Button - takes 50% width)
-                        Button(
+                        // 2. THE MAGIC SPACER: This expands to push the Bluetooth button to the far right
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // 3. Right Side (Bluetooth Settings Button)
+                        IconButton(
                             onClick = {
-                                if (guardianPhone != null) triggerSosCall(context, guardianPhone!!)
+                                tts.speak("Opening Bluetooth Settings", TextToSpeech.QUEUE_FLUSH, null, null)
+                                navController.navigate("bluetoothSettings")
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            ),
-                            shape = RoundedCornerShape(12.dp),
+                            // Add the background here: a subtle purple (from your palette) with high transparency, and rounded corners
                             modifier = Modifier
-                                .weight(1f)
-                                .height(50.dp)
-                                .padding(end = 16.dp)
+                                .padding(end = 8.dp)
+                                .background(
+                                    color = Color(0xFFA87FFB).copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
                         ) {
-                            Icon(Icons.Default.Warning, contentDescription = "SOS")
-                            Spacer(Modifier.width(8.dp))
-                            Text("SOS", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Bluetooth,
+                                contentDescription = "Bluetooth Settings",
+                                tint = Color(0xFFA87FFB) // Changed to purple to match the background!
+                            )
                         }
+
                     }
                 }
             },
             bottomBar = {
-                // We use a Box so we can draw the Speak button ON TOP of the slim footer panel
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    // 1. The Slimmer Background Panel
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shadowElevation = 16.dp,
-                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                                // REDUCED PADDING: We shrunk this from 16.dp to 8.dp to slim the footer
-                                .padding(top = 8.dp, bottom = 8.dp)
-                                .navigationBarsPadding(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-
-                            // 1. Home Button
-                            Column(
-                                modifier = Modifier.size(56.dp).clickable { /* TODO: Navigate to Home */ },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.Default.Home, "Home", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                                Spacer(Modifier.height(2.dp))
-                                Text("Home", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                            }
-
-                            // 2. Stick Button
-                            Column(
-                                modifier = Modifier.size(56.dp).clickable { /* TODO: Open Stick settings */ },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.Default.Accessibility, "Stick", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                                Spacer(Modifier.height(2.dp))
-                                Text("Stick", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                            }
-
-                            // 3. Invisible Spacer
-                            // This holds the physical empty gap in the Row so the floating button has a place to sit
-                            Spacer(modifier = Modifier.width(56.dp))
-
-                            // 4. The Blank Slot
-                            Box(modifier = Modifier.size(56.dp))
-                            // 4. The Contact Button (Fourth from left)
-                            Column(
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clickable {
-                                        if (guardianPhone != null) {
-                                            // Speaks out loud to confirm, then triggers the phone call
-                                            tts.speak("Calling guardian", TextToSpeech.QUEUE_FLUSH, null, null)
-                                            triggerSosCall(context, guardianPhone!!)
-                                        } else {
-                                            // Failsafe if they haven't linked a guardian yet
-                                            tts.speak("No guardian connected yet", TextToSpeech.QUEUE_FLUSH, null, null)
-                                        }
-                                    },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Call,
-                                    contentDescription = "Contact",
-                                    modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = "Contact",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                            }
-
-                            // 5. Profile Button
-                            Column(
-                                modifier = Modifier.size(56.dp).clickable { /* TODO: Open Profile */ },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.Default.AccountCircle, "Profile", modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                                Spacer(Modifier.height(2.dp))
-                                Text("Profile", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                            }
+                CompanionBottomBar(
+                    onHomeClick = { Toast.makeText(context, "You are already home", Toast.LENGTH_SHORT).show() },
+                    onStickClick = { navController.navigate("StickScreen") { launchSingleTop = true } },
+                    onSpeakClick = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
                         }
-                    }
-
-                    // 2. The Overlapping Speak Button
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                            }
-                            speechLauncher.launch(intent)
-                        },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            // We align it to the TopCenter of the Box (which is the top curved edge of the footer)
-                            .align(Alignment.TopCenter)
-                            // This offset pushes it UP into the screen, making it break out of the footer!
-                            .offset(y = (-36).dp)
-                            .size(width = 85.dp, height = 85.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Tap to Speak",
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                }
+                        speechLauncher.launch(intent)
+                    },
+                    onContactsClick = {
+                        tts.speak("Opening your trusted contacts.", TextToSpeech.QUEUE_FLUSH, null, null)
+                        navController.navigate("contacts") { launchSingleTop = true }
+                    },
+                    onProfileClick = {
+                        tts.speak("Opening profile.", TextToSpeech.QUEUE_FLUSH, null, null)
+                        navController.navigate("profileScreen") { launchSingleTop = true }
+                    },
+                    selectedTab = 0
+                )
+            },
+            floatingActionButton = {
+                FloatingSOSButton()
             }
-        ){ innerPadding ->
+        ) { innerPadding ->
             Box(
                 modifier = Modifier
                     .padding(innerPadding)
@@ -703,12 +587,11 @@ fun BlindHomeScreen(navController: NavController) {
                     // ── NEW: Emergency Protocol Button ────────
                     EmergencyProtocolCard(
                         onClick = {
-                            if (guardianPhone != null) {
-                                triggerSosCall(context, guardianPhone!!)
-                                Toast.makeText(context, "Initiating Emergency Protocol...", Toast.LENGTH_LONG).show()
-                            } else {
-                                Toast.makeText(context, "No guardian connected!", Toast.LENGTH_LONG).show()
-                            }
+                            // 1. The TTS Add-on you requested
+                            tts.speak("Emergency protocol menu opened.", TextToSpeech.QUEUE_FLUSH, null, null)
+
+                            // 2. Open the new settings page
+                            navController.navigate("emergencyProtocol")
                         }
                     )
 
@@ -751,58 +634,7 @@ fun BlindHomeScreen(navController: NavController) {
                         }
                     }
 
-                    // ── SOS Emergency Contact Card ────────────────────────────
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (guardianPhone != null)
-                                MaterialTheme.colorScheme.errorContainer
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (guardianPhone != null)
-                                            MaterialTheme.colorScheme.error
-                                        else
-                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Phone,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onError,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                            Spacer(Modifier.width(14.dp))
-                            Column {
-                                Text(
-                                    text = "SOS Emergency Contact",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = guardianPhone ?: "No guardian connected yet",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                                )
-                            }
-                        }
-                    }
+
 
                     // Large spacer to prevent content from hiding behind the big FAB
                     Spacer(modifier = Modifier.height(80.dp))
@@ -820,79 +652,7 @@ fun triggerSosCall(context: Context, phone: String) {
 
 private fun Double.fmt(d: Int) = "%.${d}f".format(this)
 
-@Composable
-fun BlindPersonBottomBar(items: List<BottomNavItem>) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant, // Give it a distinct panel background
-        shadowElevation = 16.dp, // Nice shadow for separation
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp) // Round the top corners
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .navigationBarsPadding(), // Ensures it works with different system nav bars
-            horizontalArrangement = Arrangement.SpaceBetween, // Automatically handle spacing!
-            verticalAlignment = Alignment.CenterVertically
-        ) {
 
-            // Loop through each of our 4 items
-            items.forEachIndexed { index, item ->
-
-                // --- Insert the blank slot logic before the 4th item (Profile) ---
-                if (index == 3) {
-                    // This creates an empty box that takes up the same space as a button
-                    Box(modifier = Modifier.size(width = 60.dp, height = 60.dp))
-                }
-
-                if (item.isHighlighted) {
-                    // --- Special layout for the central, highlighted Speak button ---
-                    Column(
-                        modifier = Modifier
-                            .clickable { item.onClick() }
-                            .padding(12.dp)
-                            .size(60.dp) // Total size of the special element
-                            .background(
-                                color = MaterialTheme.colorScheme.primaryContainer, // High-contrast, highlighted color
-                                shape = CircleShape // Round background shape
-                            ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.title,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer, // Text color on highlighted container
-                            modifier = Modifier.size(28.dp) // A bit bigger icon
-                        )
-                    }
-                } else {
-                    // --- Standard layout for other buttons (Home, Stick, Profile) ---
-                    Column(
-                        modifier = Modifier
-                            .clickable { item.onClick() }
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.title,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), // Softer color for secondary buttons
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = item.title,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun StepTrackerCard(stepCount: Int, isWalking: Boolean, locationText: String) {
@@ -993,73 +753,134 @@ fun StepTrackerCard(stepCount: Int, isWalking: Boolean, locationText: String) {
 }
 
 @Composable
-fun StickStatusCard(isConnected: Boolean, batteryLevel: Int) {
+fun StickStatusCard(
+    isConnected: Boolean,
+    batteryLevel: Int,
+    lastUpdated: String = "Just Now" // Ready for live timestamps later!
+) {
     Card(
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        // Uses the standard background color for your app theme
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1E)), // Deep dark gray to match your theme
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween, // Pushes one item left, one item right!
-            verticalAlignment = Alignment.CenterVertically
+                .padding(20.dp)
         ) {
-
-            // ── LEFT SIDE: Bluetooth Connection ──
+            // ── ROW 1: Stick Status ──
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // A green dot indicator to make it really obvious it's connected
+                // The rounded square icon box
                 Box(
                     modifier = Modifier
-                        .size(10.dp)
-                        .background(
-                            color = if (isConnected) Color(0xFF4CAF50) else Color.Red,
-                            shape = CircleShape
-                        )
-                )
+                        .size(56.dp)
+                        .background(Color(0xFF2A2A2E), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WifiTethering,
+                        contentDescription = "Connection",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-                Icon(
-                    imageVector = if (isConnected) Icons.Default.BluetoothConnected else Icons.Default.BluetoothDisabled,
-                    contentDescription = "Bluetooth Status",
-                    tint = if (isConnected) Color(0xFF4CAF50) else Color.Red,
-                    modifier = Modifier.size(20.dp)
-                )
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Text(
-                    text = if (isConnected) "Stick Connected" else "Disconnected",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isConnected) Color(0xFF4CAF50) else Color.Red
-                )
+                Column {
+                    Text(
+                        text = "STICK STATUS",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (isConnected) "Online" else "Offline",
+                        // That sleek neon greenish-yellow for "Online", red for "Offline"
+                        color = if (isConnected) Color(0xFFE6EE9C) else Color(0xFFE57373),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
             }
 
-            // ── RIGHT SIDE: Battery Percentage ──
+            // A subtle divider line
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 20.dp),
+                color = Color.White.copy(alpha = 0.05f)
+            )
+
+            // ── ROW 2: Battery ──
             Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(Color(0xFF2A2A2E), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.BatteryFull,
+                        contentDescription = "Battery",
+                        // Purple tint to match your app's accent color, rotated 90deg to lay flat like your image
+                        tint = Color(0xFFA87FFB),
+                        modifier = Modifier.size(28.dp).rotate(90f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column {
+                    Text(
+                        text = "BATTERY",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "$batteryLevel%",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 20.dp),
+                color = Color.White.copy(alpha = 0.05f)
+            )
+
+            // ── ROW 3: Last Updated ──
+            Column {
                 Text(
-                    text = "$batteryLevel%",
-                    fontSize = 16.sp,
+                    text = "LAST UPDATED",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    letterSpacing = 2.sp
                 )
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Icon(
-                    imageVector = Icons.Default.BatteryFull,
-                    contentDescription = "Battery Level",
-                    // Turns the battery icon green if above 20%, red if it's dying!
-                    tint = if (batteryLevel > 20) Color(0xFF4CAF50) else Color.Red,
-                    modifier = Modifier.size(24.dp)
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Small green indicator dot
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(if (isConnected) Color(0xFF81C784) else Color.Gray, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = lastUpdated,
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }
@@ -1479,5 +1300,138 @@ fun EmergencyProtocolCard(onClick: () -> Unit) {
                 modifier = Modifier.size(32.dp)
             )
         }
+    }
+}
+
+@Composable
+fun FloatingSOSButton() {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("companion_prefs", Context.MODE_PRIVATE)
+
+    // Automatically grabs whatever guardian number is saved!
+    val primarySosPhone = prefs.getString("guardian_phone", "")
+
+    val tts = remember { TextToSpeech(context) {}.apply { language = Locale("en", "IN") } }
+    DisposableEffect(Unit) { onDispose { tts.shutdown() } }
+
+    var phoneToCall by remember { mutableStateOf("") }
+
+    // Permission Launcher specific to this button
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted && phoneToCall.isNotEmpty()) {
+            val intent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneToCall"))
+            context.startActivity(intent)
+        } else {
+            Toast.makeText(context, "Permission denied for SOS call.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    FloatingActionButton(
+        onClick = {
+            if (!primarySosPhone.isNullOrEmpty()) {
+                // Announce and Call
+                tts.speak("Initiating SOS", TextToSpeech.QUEUE_FLUSH, null, null)
+
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                    val intent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$primarySosPhone"))
+                    context.startActivity(intent)
+                } else {
+                    phoneToCall = primarySosPhone
+                    callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                }
+            } else {
+                tts.speak("No primary guardian set.", TextToSpeech.QUEUE_FLUSH, null, null)
+                Toast.makeText(context, "Please set a Guardian in Emergency Protocol first", Toast.LENGTH_LONG).show()
+            }
+        },
+        containerColor = Color(0xFFD4BFFF), // The sleek light purple from your image
+        contentColor = Color(0xFF2D2440),   // Deep dark purple text
+        shape = RoundedCornerShape(16.dp),  // Perfectly rounded square
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
+    ) {
+        Text(
+            text = "SOS",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
+}
+
+@Composable
+fun CompanionBottomBar(
+    onHomeClick: () -> Unit,
+    onStickClick: () -> Unit,
+    onSpeakClick: () -> Unit,
+    onContactsClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    selectedTab: Int = -1
+) {
+    val navColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    val highlightColor = Color(0xFFA87FFB)
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        // 1. The main panel
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shadowElevation = 16.dp,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                BottomNavItemUi("Home", Icons.Default.Home, selectedTab == 0, onHomeClick, if (selectedTab == 0) highlightColor else navColor)
+                BottomNavItemUi("Stick", Icons.Default.Accessibility, selectedTab == 1, onStickClick, if (selectedTab == 1) highlightColor else navColor)
+
+                // Invisible Spacer for the floating button
+                Spacer(modifier = Modifier.width(56.dp))
+
+                BottomNavItemUi("Contact", Icons.Default.Call, selectedTab == 2, onContactsClick, if (selectedTab == 2) highlightColor else navColor)
+                BottomNavItemUi("Profile", Icons.Default.AccountCircle, selectedTab == 3, onProfileClick, if (selectedTab == 3) highlightColor else navColor)
+            }
+        }
+
+        // 2. The overlapping floating Speak button
+        ExtendedFloatingActionButton(
+            onClick = onSpeakClick,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shape = CircleShape,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-36).dp)
+                .size(width = 85.dp, height = 85.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Mic,
+                contentDescription = "Tap to Speak",
+                modifier = Modifier.size(48.dp)
+            )
+        }
+    }
+}
+
+// A small helper to draw the individual icons
+@Composable
+private fun BottomNavItemUi(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, isSelected: Boolean, onClick: () -> Unit, tintColor: Color) {
+    Column(
+        modifier = Modifier.size(56.dp).clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(imageVector = icon, contentDescription = title, modifier = Modifier.size(28.dp), tint = tintColor)
+        Spacer(Modifier.height(2.dp))
+        Text(text = title, fontSize = 11.sp, color = tintColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
     }
 }

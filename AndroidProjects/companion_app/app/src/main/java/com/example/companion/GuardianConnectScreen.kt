@@ -1,6 +1,6 @@
 package com.example.companion
 
-import android.content.Context
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -152,56 +152,15 @@ fun GuardianConnectScreen(onConnected: () -> Unit) {
 
                     Button(
                         onClick = {
-                            if (codeInput.length != 6) {
-                                errorMessage = "Please enter a full 6-character ID"
-                            } else {
-                                isConnecting = true
-                                val prefs = context.getSharedPreferences(
-                                    "companion_prefs", Context.MODE_PRIVATE
-                                )
-                                // Guardian's own phone number saved locally
-                                val guardianPhone = prefs.getString("guardian_phone", "") ?: ""
-
-                                // ── Validate ID exists in Firestore ───────────
-                                FirebaseManager.connectGuardian(
-                                    blindId = codeInput,
-                                    guardianPhone = guardianPhone,
-                                    connectedBlindId = codeInput,
-                                    onSuccess = {
-                                        prefs.edit()
-                                            .putString("connected_blind_id", codeInput)
-                                            .apply()
-                                        isConnecting = false
-                                        onConnected()
-                                    },
-                                    onFailed = { err ->
-                                        isConnecting = false
-                                        errorMessage = err
-                                    }
-                                )
-                            }
+                            // This simply triggers the callback to tell MainActivity to navigate!
+                            onConnected()
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        enabled = !isConnecting
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        if (isConnecting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(Icons.Default.Person, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                "Connect & Track",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Icon(imageVector = Icons.Default.Person, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Connect & Track", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

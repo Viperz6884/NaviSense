@@ -103,4 +103,96 @@ object FirebaseManager {
                 )
             )
     }
+    // ── Save Encrypted Trusted Contact (SECURITY LAYER 02) ────────────────────
+    // ── Save Encrypted Trusted Contact ────────────────────
+    fun saveEncryptedContact(
+        blindId: String,
+        contact: TrustedContact,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        val encryptedName = CryptoHelper.encrypt(contact.name)
+        val encryptedRelation = CryptoHelper.encrypt(contact.relation)
+        val encryptedPhone = CryptoHelper.encrypt(contact.phoneNumber) // NEW
+
+        val contactData = hashMapOf(
+            "id" to contact.id,
+            "encName" to encryptedName,
+            "encRelation" to encryptedRelation,
+            "encPhone" to encryptedPhone, // NEW
+            "liveAudio" to contact.liveAudio,
+            "locationHistory" to contact.locationHistory,
+            "sosNotification" to contact.sosNotification
+        )
+
+        db.collection("users").document(blindId)
+            .collection("trusted_contacts").document(contact.id)
+            .set(contactData)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+    // ── Fetch Encrypted Trusted Contacts ──────────────────────────────────────
+    // ── Fetch Encrypted Trusted Contacts ──────────────────────────────────────
+    fun getTrustedContacts(
+        blindId: String,
+        onResult: (List<TrustedContact>) -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        db.collection("users").document(blindId).collection("trusted_contacts")
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val contacts = mutableListOf<TrustedContact>()
+                for (doc in snapshot.documents) {
+                    try {
+                        val encName = doc.getString("encName") ?: ""
+                        val encRelation = doc.getString("encRelation") ?: ""
+                        val encPhone = doc.getString("encPhone") ?: "" // NEW
+
+                        val decName = CryptoHelper.decrypt(encName)
+                        val decRelation = CryptoHelper.decrypt(encRelation)
+                        val decPhone = CryptoHelper.decrypt(encPhone) // NEW
+
+                        contacts.add(
+                            TrustedContact(
+                                id = doc.getString("id") ?: doc.id,
+                                name = decName,
+                                relation = decRelation,
+                                phoneNumber = decPhone, // NEW
+                                liveAudio = doc.getBoolean("liveAudio") ?: false,
+                                locationHistory = doc.getBoolean("locationHistory") ?: false,
+                                sosNotification = doc.getBoolean("sosNotification") ?: false
+                            )
+                        )
+                    } catch (e: Exception) {
+                        // Safely skip corrupted data
+                    }
+                }
+                onResult(contacts)
+            }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+    // ── Delete Trusted Contact ──────────────────────────────────────────────
+    fun deleteTrustedContact(
+        blindId: String,
+        contactId: String,
+        onSuccess: () -> Unit,
+        onFailure: (Exception) -> Unit
+    ) {
+        db.collection("users").document(blindId)
+            .collection("trusted_contacts").document(contactId)
+            .delete()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onFailure(e) }
+    }
+
+    // ── Save Primary Guardian ──────────────────────────────────────────────
+    fun setGuardianPhone(blindId: String, phone: String) {
+        val updateData = mapOf("guardianPhone" to phone)
+
+        // Call getInstance() directly here instead of using 'db'
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            .collection("users").document(blindId)
+            .set(updateData, com.google.firebase.firestore.SetOptions.merge())
+    }
+
 }

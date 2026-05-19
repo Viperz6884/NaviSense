@@ -1,5 +1,7 @@
 package com.example.companion
 
+import com.example.companion.BlindViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -16,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -175,6 +178,26 @@ fun CompanionAppRouter(onNavControllerCreated: (NavController) -> Unit) {
                 SignUpScreen(navController = navController)
             }
 
+            composable("StickScreen") {
+                StickScreen(navController)
+            }
+            // Register the Contacts Page with the ID 'contacts'
+            composable("contacts") {
+                BlindContactsScreen(navController)
+            }
+
+            composable("emergencyProtocol") {
+                EmergencyProtocolScreen(navController = navController)
+            }
+
+            composable("bluetoothSettings") {
+                // Retrieve your main ViewModel here or define a new Bluetooth specific one
+                val viewModel: BlindViewModel = viewModel() // Use existing VM or define a scoped one
+                BluetoothSettingsScreen(navController = navController, viewModel = viewModel)
+            }
+
+
+
             composable("guardianConnect") {
                 GuardianConnectScreen(
                     onConnected = {
@@ -196,6 +219,18 @@ fun CompanionAppRouter(onNavControllerCreated: (NavController) -> Unit) {
 
             composable("blindHome") {
                 BlindHomeScreen(navController = navController)
+
+
+            }
+
+            composable("profileScreen") {
+                ProfileScreen(navController = navController)
+            }
+            composable("guardianHome") {
+                GuardianScreen(navController)
+            }
+            composable("guardianSos") {
+                GuardianSOSScreen(navController = navController)
             }
         }
     }
