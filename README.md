@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Cloud-Firebase_Firestore_&_RTDB-FFA611?style=for-the-badge&logo=firebase&logoColor=white" alt="Firebase" />
   <img src="https://img.shields.io/badge/Hardware-ESP32_Smart_Stick-00979D?style=for-the-badge&logo=espressif&logoColor=white" alt="Hardware" />
 </p>
-
+ 
 ---
 
 ## 📖 Overview
